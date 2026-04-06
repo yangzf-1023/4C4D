@@ -1,37 +1,41 @@
-import os
 import torch
-from torchvision.utils import save_image
 from torch.utils.data import Dataset
-from torchvision import datasets
-from utils.general_utils import PILtoTorch
-from PIL import Image
 import numpy as np
+import cv2
 
 class CameraDataset(Dataset):
     
     def __init__(self, viewpoint_stack, white_background):
         self.viewpoint_stack = viewpoint_stack
-        self.bg = np.array([1,1,1]) if white_background else np.array([0, 0, 0])
+        self.bg = np.array([1.0, 1.0, 1.0], dtype=np.float32) if white_background else np.array([0.0, 0.0, 0.0], dtype=np.float32)
         
     def __getitem__(self, index):
         viewpoint_cam = self.viewpoint_stack[index]
         if viewpoint_cam.meta_only:
-            with Image.open(viewpoint_cam.image_path) as image_load:
-                im_data = np.array(image_load.convert("RGBA"))
-            norm_data = im_data / 255.0
-            arr = norm_data[:,:,:3] * norm_data[:, :, 3:4] + self.bg * (1 - norm_data[:, :, 3:4])
-            image_load = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
-            resized_image_rgb = PILtoTorch(image_load, viewpoint_cam.resolution)
-            viewpoint_image = resized_image_rgb[:3, ...].clamp(0.0, 1.0)
-            if resized_image_rgb.shape[1] == 4:
-                gt_alpha_mask = resized_image_rgb[3:4, ...]
-                viewpoint_image *= gt_alpha_mask
-            else:
-                viewpoint_image *= torch.ones((1, viewpoint_cam.image_height, viewpoint_cam.image_width))
+            viewpoint_image = self._load_and_process_image(viewpoint_cam)
         else:
             viewpoint_image = viewpoint_cam.image
             
         return viewpoint_image, viewpoint_cam
+    
+    def _load_and_process_image(self, viewpoint_cam):
+        img = cv2.imread(viewpoint_cam.image_path, cv2.IMREAD_UNCHANGED)
+        
+        target_w, target_h = viewpoint_cam.resolution
+        img = cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        
+        img = img.astype(np.float32) / 255.0
+        
+        if img.shape[2] == 4:
+            rgb = img[:, :, 2::-1]  # BGR -> RGB
+            alpha = img[:, :, 3:4]
+            blended = rgb * alpha + self.bg * (1.0 - alpha)
+        else:
+            blended = img[:, :, 2::-1]
+        
+        viewpoint_image = torch.from_numpy(blended.copy()).permute(2, 0, 1).contiguous().clamp(0.0, 1.0)
+        
+        return viewpoint_image
     
     def __len__(self):
         return len(self.viewpoint_stack)
