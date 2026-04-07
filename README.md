@@ -10,7 +10,8 @@
 
 <sup>#</sup> Equal contribution &nbsp;&nbsp; <sup>*</sup> Corresponding author
 
-[![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://github.com/yangzf-1023/4C4D)
+[![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://junshengzhou.github.io/4C4D/)
+[![Paper](https://img.shields.io/badge/Paper-arXiv-red.svg)](https://arxiv.org/abs/2604.04063)
 
 </div>
 
